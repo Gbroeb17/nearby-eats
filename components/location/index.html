@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<style>
+body { margin:0; font:14px system-ui,sans-serif; }
+button { width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#172554; cursor:pointer; font:inherit; }
+button:disabled { opacity:.6; cursor:wait; }
+p { font-size:12px; line-height:1.5; color:#64748b; margin:7px 0; }
+</style>
+<button id="locate" type="button">📍 使用裝置位置</button>
+<p id="status" role="status">按下後請允許瀏覽器存取位置，不會自動搜尋餐廳。</p>
+<script>
+const button = document.getElementById('locate');
+const statusText = document.getElementById('status');
+function send(type, extra={}) {
+  window.parent.postMessage({isStreamlitMessage:true, type, ...extra}, '*');
+}
+function finish(value, text) {
+  button.disabled = false;
+  statusText.textContent = text;
+  send('streamlit:setComponentValue', {value:{...value, event_id:Date.now()}, dataType:'json'});
+  send('streamlit:setFrameHeight', {height:115});
+}
+button.addEventListener('click', () => {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    finish({status:'error'}, '此瀏覽器無法定位，請以 HTTPS 或 localhost 在一般瀏覽器開啟。');
+    return;
+  }
+  button.disabled = true;
+  statusText.textContent = '定位中，請允許位置權限…';
+  navigator.geolocation.getCurrentPosition(
+    position => finish({status:'success', lat:position.coords.latitude,
+      lon:position.coords.longitude, accuracy:position.coords.accuracy}, '已取得位置。請按「搜尋附近餐廳」。'),
+    error => finish({status:'error'}, ({1:'未取得位置權限。請檢查瀏覽器及系統的位置設定，或改用中央大學位置。',
+      2:'暫時無法取得位置，可重試或改用中央大學位置。',
+      3:'定位逾時，可重試或改用中央大學位置。'})[error.code] || '定位失敗，請重試。'),
+    {enableHighAccuracy:true, timeout:15000, maximumAge:60000}
+  );
+});
+send('streamlit:componentReady', {apiVersion:1});
+send('streamlit:setFrameHeight', {height:115});
+</script>
+</html>

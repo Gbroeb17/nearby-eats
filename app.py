@@ -5,6 +5,7 @@ from restaurant import DEMO_PLACES, search
 import streamlit as st
 import sqlite3
 from usage_limit import DEFAULT_LIMIT, month_key, used_count, limited_search
+from location_picker import device_location, valid_position
 
 st.set_page_config(page_title='附近吃什麼？', page_icon='🍜', layout='wide')
 st.title('🍜 附近吃什麼？')
@@ -18,9 +19,34 @@ else:
 
 with st.sidebar:
     st.header('搜尋條件')
-    st.caption('預設搜尋中心：中央大學周邊。此版本使用手動座標，尚未取得裝置位置。')
-    lat = st.number_input('緯度', min_value=-90.0, max_value=90.0, value=24.9683, format='%.4f')
-    lon = st.number_input('經度', min_value=-180.0, max_value=180.0, value=121.1929, format='%.4f')
+    st.session_state.setdefault('search_lat', 24.9683)
+    st.session_state.setdefault('search_lon', 121.1929)
+    st.session_state.setdefault('location_label', '中央大學周邊（預設）')
+    position = device_location(key='device_position', default=None)
+    if valid_position(position) and position.get('event_id') != st.session_state.get('location_event'):
+        st.session_state.search_lat = float(position['lat'])
+        st.session_state.search_lon = float(position['lon'])
+        st.session_state.location_event = position.get('event_id')
+        st.session_state.location_label = '裝置目前位置'
+        accuracy = position.get('accuracy')
+        st.session_state.location_accuracy = accuracy if type(accuracy) in (int, float) else None
+    if st.button('使用中央大學周邊'):
+        st.session_state.search_lat = 24.9683
+        st.session_state.search_lon = 121.1929
+        st.session_state.location_label = '中央大學周邊'
+        st.session_state.location_accuracy = None
+    st.caption('搜尋中心：' + st.session_state.location_label)
+    accuracy = st.session_state.get('location_accuracy')
+    if accuracy is not None:
+        st.caption(f'定位誤差約 {accuracy:.0f} 公尺；電腦定位可能較不精確。')
+    with st.expander('手動調整位置（選用）'):
+        def mark_manual():
+            st.session_state.location_label = '手動指定位置'
+            st.session_state.location_accuracy = None
+        lat = st.number_input('緯度', min_value=-90.0, max_value=90.0,
+                              key='search_lat', format='%.6f', on_change=mark_manual)
+        lon = st.number_input('經度', min_value=-180.0, max_value=180.0,
+                              key='search_lon', format='%.6f', on_change=mark_manual)
     radius = st.select_slider('直線搜尋半徑（公里）', options=[1, 3, 5], value=3)
     sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高'])
     only_open = st.checkbox('只看營業中', value=True)
@@ -73,7 +99,7 @@ minute = demo_time.hour * 60 + demo_time.minute
 if live:
     snapshot = st.session_state.get('live_result')
     if snapshot is None:
-        st.info('請在左側設定座標和半徑，再按「搜尋附近餐廳」。')
+        st.info('請在左側使用裝置位置或中央大學位置，選擇半徑後按「搜尋附近餐廳」。')
         st.stop()
     places, search_lat, search_lon, search_radius, fetched_at = snapshot
     if (lat, lon, radius) != (search_lat, search_lon, search_radius):
