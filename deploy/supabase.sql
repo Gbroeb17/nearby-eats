@@ -7,3 +7,4 @@ CREATE TABLE IF NOT EXISTS nearby_eats.api_usage (
     requests integer NOT NULL DEFAULT 0 CHECK (requests >= 0)
 );
 REVOKE ALL ON nearby_eats.api_usage FROM PUBLIC, anon, authenticated;
+ALTER TABLE nearby_eats.api_usage ENABLE ROW LEVEL SECURITY;
