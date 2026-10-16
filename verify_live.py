@@ -1,0 +1,15 @@
+"""One manual smoke request; print only counts, never credentials or raw payloads."""
+import tomllib
+from pathlib import Path
+from datetime import datetime, timezone
+from places_api import fetch_nearby, live_rows
+
+if __name__ == '__main__':
+    config = tomllib.loads(Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))
+    try:
+        places = fetch_nearby(config.get('GOOGLE_PLACES_API_KEY', ''), 25.0173, 121.5398, 3)
+        rows = live_rows(places, 25.0173, 121.5398, 3, False, 0, '距離最近', datetime.now(timezone.utc))
+        print(f'Live API check passed: {len(places)} places, {len(rows)} displayable restaurants.')
+    except ValueError as error:
+        print(str(error))
+        raise SystemExit(1)
