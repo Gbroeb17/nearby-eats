@@ -3,6 +3,8 @@ from datetime import datetime, timezone, time, timedelta
 from places_api import fetch_nearby, live_rows
 from restaurant import DEMO_PLACES, search
 import streamlit as st
+import sqlite3
+from usage_limit import DEFAULT_LIMIT, month_key, used_count, limited_search
 
 st.set_page_config(page_title='附近吃什麼？', page_icon='🍜', layout='wide')
 st.title('🍜 附近吃什麼？')
@@ -27,14 +29,45 @@ with st.sidebar:
     if not live:
         demo_time = st.time_input('模擬查詢時間（台灣時間）', value=demo_time)
         st.caption('展示時段假設每天相同。')
-    if live and st.button('搜尋附近餐廳', type='primary'):
+    blocked = False
+    limit = DEFAULT_LIMIT
+    external_used = 0
+    usage_slot = st.empty()
+    if live:
+        try:
+            limit = st.secrets.get('MONTHLY_REQUEST_LIMIT', DEFAULT_LIMIT)
+            external_used = st.secrets.get('EXTERNAL_USAGE_BY_MONTH', {}).get(month_key(), 0)
+            if type(limit) is not int or type(external_used) is not int or not 0 <= limit <= DEFAULT_LIMIT or external_used < 0:
+                raise ValueError('額度設定無效，請管理者檢查本機設定。')
+            used = used_count()
+            usage_slot.caption(f'本月網站計數：{used} 次；外部用量補計：{external_used} 次；安全上限：{limit} 次。')
+            blocked = used + external_used >= limit
+        except (sqlite3.Error, OSError, ValueError):
+            blocked = True
+            st.error('無法確認查詢額度，暫停查詢，請聯絡管理者。')
+        if blocked:
+            st.error('本月查詢額度已達上限或無法確認，暫不開放查詢。')
+        st.caption('此為網站共用計數，不是 Google 官方帳單用量。模擬展示仍可使用。')
+    if live and st.button('搜尋附近餐廳', type='primary', disabled=blocked):
         try:
             with st.spinner('正在向 Google 搜尋…'):
-                places = fetch_nearby(st.secrets.get('GOOGLE_PLACES_API_KEY', ''), lat, lon, radius)
+                places = limited_search(fetch_nearby, st.secrets.get('GOOGLE_PLACES_API_KEY', ''),
+                                        lat, lon, radius, limit=limit, external_used=external_used)
             st.session_state.live_result = (places, lat, lon, radius, datetime.now(timezone.utc))
             st.session_state.selected_category = None
         except (ValueError, FileNotFoundError) as error:
             st.error(str(error))
+        except (sqlite3.Error, OSError):
+            st.error('無法確認查詢額度，已停止查詢。')
+        finally:
+            try:
+                used = used_count()
+                usage_slot.caption(f'本月網站計數：{used} 次；外部用量補計：{external_used} 次；安全上限：{limit} 次。')
+                if used + external_used >= limit:
+                    st.error('本月查詢額度已達網站上限，暫不開放新的查詢。')
+                    st.rerun()
+            except (sqlite3.Error, OSError):
+                pass
 
 minute = demo_time.hour * 60 + demo_time.minute
 if live:
