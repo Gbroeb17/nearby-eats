@@ -1,5 +1,5 @@
 """Pure search logic for fictional restaurant demonstrations."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import asin, cos, radians, sin, sqrt
 
 
@@ -68,3 +68,7 @@ DEMO_PLACES = [
     Restaurant('範例・全天豆漿', '中式料理', 25.008, 121.540, 4.1, 670, ((0, 1440),)),
     Restaurant('範例・遠方蒸餃', '中式料理', 25.061, 121.554, 4.5, 140, ()),
 ]
+
+# Keep fictional examples around the same default center as the application.
+DEMO_PLACES = [replace(p, lat=p.lat + (24.9683 - 25.0173),
+                       lon=p.lon + (121.1929 - 121.5398)) for p in DEMO_PLACES]

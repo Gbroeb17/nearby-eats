@@ -9,10 +9,10 @@ if __name__ == '__main__':
     config = tomllib.loads(Path('.streamlit/secrets.toml').read_text(encoding='utf-8'))
     try:
         places = limited_search(fetch_nearby, config.get('GOOGLE_PLACES_API_KEY', ''),
-                                25.0173, 121.5398, 3,
+                                24.9683, 121.1929, 3,
                                 limit=min(config.get('MONTHLY_REQUEST_LIMIT', DEFAULT_LIMIT), DEFAULT_LIMIT),
                                 external_used=config.get('EXTERNAL_USAGE_BY_MONTH', {}).get(month_key(), 0))
-        rows = live_rows(places, 25.0173, 121.5398, 3, False, 0, '距離最近', datetime.now(timezone.utc))
+        rows = live_rows(places, 24.9683, 121.1929, 3, False, 0, '距離最近', datetime.now(timezone.utc))
         print(f'Live API check passed: {len(places)} places, {len(rows)} displayable restaurants.')
     except ValueError as error:
         print(str(error))

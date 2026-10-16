@@ -18,9 +18,9 @@ else:
 
 with st.sidebar:
     st.header('搜尋條件')
-    st.caption('預設示範中心：台大周邊。此版本使用手動座標，尚未取得裝置位置。')
-    lat = st.number_input('緯度', min_value=-90.0, max_value=90.0, value=25.0173, format='%.4f')
-    lon = st.number_input('經度', min_value=-180.0, max_value=180.0, value=121.5398, format='%.4f')
+    st.caption('預設搜尋中心：中央大學周邊。此版本使用手動座標，尚未取得裝置位置。')
+    lat = st.number_input('緯度', min_value=-90.0, max_value=90.0, value=24.9683, format='%.4f')
+    lon = st.number_input('經度', min_value=-180.0, max_value=180.0, value=121.1929, format='%.4f')
     radius = st.select_slider('直線搜尋半徑（公里）', options=[1, 3, 5], value=3)
     sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高'])
     only_open = st.checkbox('只看營業中', value=True)
