@@ -26,7 +26,23 @@
 
 Python 3.12、Streamlit、Google Places API、pytest、GitHub Actions。
 
-目前為專案初始化階段，尚未實作應用程式。
+目前已完成可操作的模擬版，尚未串接真實餐廳資料或裝置定位。所有店家與營業資料皆為虛構。
+
+## 本機啟動（Windows PowerShell）
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python -m streamlit run app.py
+```
+
+啟動後開啟終端機顯示的本機網址，通常是 http://localhost:8501 。不需要 Google API 金鑰即可操作模擬版。
+
+```powershell
+.\.venv\Scripts\python -m pytest -q
+```
+
+模擬版的營業時間假設每天相同；正式資料串接時需另外處理週間排程、特殊日期與店家時區。評分排序採評分、評論數、距離依序比較，並非綜合推薦演算法。
 
 ## 金鑰管理
 
