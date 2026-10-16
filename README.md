@@ -1,0 +1,37 @@
+# 附近吃什麼？ Nearby Eats
+
+使用 Python 與 Streamlit 製作的附近餐廳搜尋工具，為 AI-Assisted Programming Project 課程專案。
+
+## 專案目標
+
+協助使用者依距離、餐廳種類、評分與營業時間選擇餐廳。搜尋結果受資料來源與回傳數量限制，不保證包含範圍內所有餐廳。
+
+## 預計功能
+
+- 指定搜尋位置與 1、3、5 公里半徑。
+- 依餐廳種類分組，依距離或評分排序。
+- 顯示評分、評論數、直線距離與營業狀態。
+- 顯示打烊時間；缺少資料時明確標示未知。
+- 篩選營業中的餐廳，連結至 Google Maps。
+
+## 開發順序
+
+1. 使用明確標示的模擬資料完成可操作介面。
+2. 串接 Google Places API，處理錯誤與缺漏資料。
+3. 測試距離、排序與跨午夜營業時間等核心邏輯。
+4. 完成報告與 AI 協作紀錄。
+5. 視時間加入 MCP 搜尋工具。
+
+## 技術規劃
+
+Python 3.12、Streamlit、Google Places API、pytest、GitHub Actions。
+
+目前為專案初始化階段，尚未實作應用程式。
+
+## 金鑰管理
+
+API 金鑰使用環境變數或本機 Streamlit secrets 設定，禁止提交到 GitHub。真實資料串接前，需設定金鑰限制、使用配額與費用提醒。
+
+## 作業紀錄
+
+AI 合作過程記錄於 [docs/ai-collaboration.md](docs/ai-collaboration.md)。開發時逐步提交可驗證的變更，不補造開發歷史。
