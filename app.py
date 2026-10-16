@@ -4,7 +4,7 @@ from places_api import fetch_nearby, live_rows
 from restaurant import DEMO_PLACES, search
 import streamlit as st
 import sqlite3
-from usage_limit import DEFAULT_LIMIT, month_key, used_count, limited_search
+from usage_limit import DEFAULT_LIMIT, DEFAULT_DB, month_key, used_count, limited_search
 from location_picker import device_location, valid_position
 
 st.set_page_config(page_title='附近吃什麼？', page_icon='🍜', layout='wide')
@@ -58,14 +58,24 @@ with st.sidebar:
     blocked = False
     limit = DEFAULT_LIMIT
     external_used = 0
+    quota_path = None
     usage_slot = st.empty()
     if live:
         try:
+            backend = st.secrets.get('QUOTA_BACKEND', 'postgres')
+            if backend == 'sqlite':
+                quota_path = DEFAULT_DB
+            elif backend == 'postgres':
+                quota_path = st.secrets.get('QUOTA_DATABASE_URL', '')
+                if not quota_path.startswith(('postgres://', 'postgresql://')):
+                    raise ValueError('尚未設定雲端用量資料庫。')
+            else:
+                raise ValueError('未知用量儲存方式。')
             limit = st.secrets.get('MONTHLY_REQUEST_LIMIT', DEFAULT_LIMIT)
             external_used = st.secrets.get('EXTERNAL_USAGE_BY_MONTH', {}).get(month_key(), 0)
             if type(limit) is not int or type(external_used) is not int or not 0 <= limit <= DEFAULT_LIMIT or external_used < 0:
                 raise ValueError('額度設定無效，請管理者檢查本機設定。')
-            used = used_count()
+            used = used_count(path=quota_path)
             usage_slot.caption(f'本月網站計數：{used} 次；外部用量補計：{external_used} 次；安全上限：{limit} 次。')
             blocked = used + external_used >= limit
         except (sqlite3.Error, OSError, ValueError):
@@ -78,7 +88,7 @@ with st.sidebar:
         try:
             with st.spinner('正在向 Google 搜尋…'):
                 places = limited_search(fetch_nearby, st.secrets.get('GOOGLE_PLACES_API_KEY', ''),
-                                        lat, lon, radius, limit=limit, external_used=external_used)
+                                        lat, lon, radius, path=quota_path, limit=limit, external_used=external_used)
             st.session_state.live_result = (places, lat, lon, radius, datetime.now(timezone.utc))
             st.session_state.selected_category = None
         except (ValueError, FileNotFoundError) as error:
@@ -87,12 +97,12 @@ with st.sidebar:
             st.error('無法確認查詢額度，已停止查詢。')
         finally:
             try:
-                used = used_count()
+                used = used_count(path=quota_path)
                 usage_slot.caption(f'本月網站計數：{used} 次；外部用量補計：{external_used} 次；安全上限：{limit} 次。')
                 if used + external_used >= limit:
                     st.error('本月查詢額度已達網站上限，暫不開放新的查詢。')
                     st.rerun()
-            except (sqlite3.Error, OSError):
+            except (sqlite3.Error, OSError, ValueError):
                 pass
 
 minute = demo_time.hour * 60 + demo_time.minute

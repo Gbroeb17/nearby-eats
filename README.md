@@ -32,6 +32,12 @@ Python 3.12、Streamlit、Google Places API、pytest、GitHub Actions。
 
 定位採瀏覽器 Geolocation，一次點選取得一次位置，不持續追蹤。取得位置不會呼叫 Google；按下餐廳搜尋後才將搜尋中心傳送至 Google。位置僅保留於工作階段，不寫入用量資料庫。
 
+## HTTPS 雲端部署
+
+免費部署規劃採 Streamlit Community Cloud 與 Supabase PostgreSQL，步驟見 [部署說明](docs/https-deployment.md)。範本為 `.streamlit/secrets.example.toml`，建表 SQL 為 `deploy/supabase.sql`。雲端預設要求 PostgreSQL，缺少設定或無法連線時停止真實查詢，避免誤用會在重啟後遺失的本機計數。尚未完成實際雲端部署。
+
+本機開發請在本機 secrets 的最上方設定 `QUOTA_BACKEND = "sqlite"`；此設定不適用於免費雲端主機。PostgreSQL 計數以交易鎖定同月份資料列，供多個工作階段共用。
+
 需要瀏覽器與作業系統允許定位，網站須在 HTTPS 或本機 localhost/127.0.0.1 環境。內建瀏覽器可能不支援，可改用 Chrome 或 Edge。定位被拒、逾時或不可用時顯示提示，保留原搜尋中心，可一鍵切回中央大學或展開手動座標。電腦定位可能存在較大誤差，畫面顯示瀏覽器回報的精確度。手機連線至電腦的區網 HTTP 網址一般不符合安全環境要求，部署至 HTTPS 後再使用手機定位。
 
 ## Google 真實搜尋
