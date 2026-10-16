@@ -13,7 +13,6 @@ with st.sidebar:
     lat = st.number_input('緯度', min_value=-90.0, max_value=90.0, value=25.0173, format='%.4f')
     lon = st.number_input('經度', min_value=-180.0, max_value=180.0, value=121.5398, format='%.4f')
     radius = st.select_slider('直線搜尋半徑（公里）', options=[1, 3, 5], value=3)
-    category = st.selectbox('餐廳種類', ['全部'] + sorted({p.category for p in DEMO_PLACES}))
     sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高'])
     only_open = st.checkbox('只看營業中', value=True)
     min_remaining = st.selectbox('至少多久後才打烊', [0, 30, 60, 90], format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
@@ -21,17 +20,37 @@ with st.sidebar:
     st.caption('可調整時間，測試午休、深夜與跨日營業。展示時段假設每天相同。')
 
 minute = demo_time.hour * 60 + demo_time.minute
-rows = search(DEMO_PLACES, lat, lon, radius, minute, category, only_open, min_remaining, sort_by)
+rows = search(DEMO_PLACES, lat, lon, radius, minute, only_open=only_open,
+              min_remaining=min_remaining, sort_by=sort_by)
+groups = defaultdict(list)
+for row in rows:
+    groups[row[0].category].append(row)
+if st.session_state.get('selected_category') not in groups:
+    st.session_state.selected_category = None
+
+
+def select_category(category):
+    st.session_state.selected_category = category
+
+
 st.subheader(f'找到 {len(rows)} 家範例餐廳')
 st.caption(f'中心 {lat:.4f}, {lon:.4f} · 半徑 {radius} 公里 · 模擬時間 {demo_time:%H:%M} · 距離為直線距離')
 if not rows:
     st.info('沒有符合條件的範例餐廳，試著放大半徑或放寬營業條件。')
 else:
-    groups = defaultdict(list)
-    for row in rows:
-        groups[row[0].category].append(row)
-    for group, entries in sorted(groups.items()):
-        st.subheader(group)
+    selected = st.session_state.selected_category
+    if selected is None:
+        st.subheader('今天想吃什麼？')
+        st.caption('點選食物類別，查看餐廳與排名。列表只顯示符合目前搜尋條件的類別。')
+        icons = {'日式料理': '🍣', '義式料理': '🍝', '早餐': '🥪', '咖啡甜點': '☕', '中式料理': '🥟'}
+        for group, entries in sorted(groups.items()):
+            st.button(f'{icons.get(group, "🍽️")} {group}　·　{len(entries)} 家　→',
+                      key=f'category_{group}', use_container_width=True,
+                      on_click=select_category, args=(group,))
+    else:
+        st.button('← 返回食物類別', on_click=select_category, args=(None,))
+        st.subheader(f'{selected} · {len(groups[selected])} 家')
+    for group, entries in ([(selected, groups[selected])] if selected else []):
         for rank, (place, distance, remaining) in enumerate(entries, 1):
             with st.container(border=True):
                 st.markdown(f'**{rank}. {place.name}**')
