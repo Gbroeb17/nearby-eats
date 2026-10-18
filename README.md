@@ -42,6 +42,18 @@ Python 3.12、Streamlit、Google Places API、pytest、GitHub Actions。
 
 ## Google 真實搜尋
 
+### 步行預估
+
+搜尋會使用相同中心作為步行起點，在同一次 Nearby Search 請求加入 `routingParameters.travelMode = WALK` 與 `routingSummaries`。依回應陣列位置對應各店家，不會逐家追加路線請求，也不會在點分類或切換排序時重新呼叫。
+
+餐廳卡片顯示路線距離、向上取整的預估步行分鐘，以及打烊時間扣掉當下時間和步行秒數後的剩餘分鐘（向下取整）。這並非可點餐或可坐滿的保證，未包含最後收客、點餐或候餐時間。過晚抵達時顯示警示；路線缺失、錯誤或時間未知時不以直線距離推測。搜尋半徑與 Google 回傳的最近二十家仍以直線距離為準，步行排序只比較這一批結果。
+
+可選步行最快排序與最長步行分鐘篩選；缺少路線的店家在步行排序排最後，啟用步行時間篩選時排除。切換至裝置位置後需重新搜尋，否則仍以原搜尋中心為起點。
+
+**計費更新（2026-10-18 查核）**：`routingSummaries` 會使搜尋計入 Nearby Search Enterprise + Atmosphere。目前每月免費 1,000 次，首級超額價格每千次 US$40。網站仍共用保守 950 次請求上限（涵蓋前後兩種搜尋，不分 SKU 重置），官方用量需另行核對。
+
+參考：[步行摘要文件](https://developers.google.com/maps/documentation/places/web-service/routing-summary)、[價格表](https://developers.google.com/maps/billing-and-pricing/pricing)。
+
 在本機建立 `.streamlit/secrets.toml`（此檔案已被 Git 忽略）：
 
 ```toml

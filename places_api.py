@@ -1,5 +1,6 @@
 """Google Places adapter. Never include credentials in errors or stored results."""
 import json
+from math import isfinite, floor
 from datetime import datetime, timezone, timedelta
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -8,7 +9,37 @@ from restaurant import Restaurant, distance_km
 FIELDS = ','.join('places.' + field for field in (
     'displayName', 'location', 'primaryType', 'types', 'primaryTypeDisplayName',
     'rating', 'userRatingCount', 'currentOpeningHours', 'googleMapsUri',
-    'formattedAddress', 'businessStatus', 'utcOffsetMinutes', 'attributions'))
+    'formattedAddress', 'businessStatus', 'utcOffsetMinutes', 'attributions')) + ',routingSummaries'
+
+
+def walking_route(summary):
+    """Unavailable/invalid route data stays unknown; never infer from straight distance."""
+    legs = summary.get('legs', []) if isinstance(summary, dict) else []
+    if len(legs) != 1 or not isinstance(legs[0], dict):
+        return None
+    duration = legs[0].get('duration', '')
+    meters = legs[0].get('distanceMeters')
+    try:
+        seconds = float(duration[:-1]) if isinstance(duration, str) and duration.endswith('s') else -1
+    except ValueError:
+        return None
+    if not isfinite(seconds) or seconds < 0:
+        return None
+    if type(meters) not in (int, float) or not isfinite(meters) or meters < 0:
+        return None
+    return {'seconds': seconds, 'meters': meters}
+
+
+def attach_walking_routes(payload):
+    places = payload.get('places', [])
+    summaries = payload.get('routingSummaries', [])
+    for index, place in enumerate(places):
+        place['_walking'] = walking_route(summaries[index]) if index < len(summaries) else None
+    return places
+
+
+def arrival_minutes(end, now, seconds):
+    return floor(((end - now).total_seconds() - seconds) / 60) if end is not None else None
 
 
 def fetch_nearby(key, lat, lon, radius):
@@ -16,6 +47,7 @@ def fetch_nearby(key, lat, lon, radius):
         raise ValueError('尚未設定有效的 GOOGLE_PLACES_API_KEY。')
     body = dict(includedTypes=['restaurant'], maxResultCount=20,
                 rankPreference='DISTANCE', languageCode='zh-TW',
+                routingParameters={'origin': {'latitude': lat, 'longitude': lon}, 'travelMode': 'WALK'},
                 locationRestriction={'circle': {'center': {'latitude': lat, 'longitude': lon},
                                                 'radius': radius * 1000}})
     request = Request('https://places.googleapis.com/v1/places:searchNearby',
@@ -24,7 +56,7 @@ def fetch_nearby(key, lat, lon, radius):
                                'X-Goog-FieldMask': FIELDS})
     try:
         with urlopen(request, timeout=20) as response:
-            return json.load(response).get('places', [])
+            return attach_walking_routes(json.load(response))
     except HTTPError as error:
         hints = {400: '請確認搜尋參數與 API 設定。', 403: '請確認帳單、Places API (New) 啟用狀態與金鑰限制。',
                  429: '配額已用完或請求太頻繁，請稍後再試。'}
@@ -72,7 +104,8 @@ def opening_status(place, now):
     return opened, remaining, local_end
 
 
-def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now):
+def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,
+              max_walk=0):
     rows = []
     for raw in places:
         loc = raw.get('location', {})
@@ -87,7 +120,15 @@ def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now):
             continue
         if min_remaining and (opened is not True or remaining is None or remaining < min_remaining):
             continue
+        walk = raw.get('_walking')
+        if max_walk and (walk is None or walk['seconds'] > max_walk * 60):
+            continue
         rows.append((place, distance, (opened, remaining, end, raw)))
-    rows.sort(key=(lambda r: (-(r[0].rating if r[0].rating is not None else -1), -r[0].reviews, r[1]))
-              if sort_by == '評分最高' else (lambda r: r[1]))
+    if sort_by == '步行最快':
+        rows.sort(key=lambda r: (r[2][3].get('_walking') is None,
+                                (r[2][3].get('_walking') or {}).get('seconds', float('inf')), r[1]))
+    elif sort_by == '評分最高':
+        rows.sort(key=lambda r: (-(r[0].rating if r[0].rating is not None else -1), -r[0].reviews, r[1]))
+    else:
+        rows.sort(key=lambda r: r[1])
     return rows

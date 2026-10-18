@@ -1,8 +1,52 @@
 from datetime import datetime, timezone
 from unittest.mock import patch
 from urllib.error import HTTPError
+from io import BytesIO
+import json
 import pytest
 from places_api import category_of, opening_status, live_rows, fetch_nearby
+from places_api import attach_walking_routes, walking_route, arrival_minutes
+
+
+def test_walking_summary_request_and_alignment():
+    payload = {'places': [{'displayName': {'text': 'A'}}, {'displayName': {'text': 'B'}}],
+               'routingSummaries': [{}, {'legs': [{'duration': '600.5s', 'distanceMeters': 850}]}]}
+    with patch('places_api.urlopen', return_value=BytesIO(json.dumps(payload).encode())) as network:
+        places = fetch_nearby('test-key', 24.9683, 121.1929, 3)
+        body = json.loads(network.call_args.args[0].data)
+        assert body['routingParameters']['travelMode'] == 'WALK'
+        assert body['routingParameters']['origin']['longitude'] == 121.1929
+        assert 'routingSummaries' in network.call_args.args[0].get_header('X-goog-fieldmask')
+        assert network.call_count == 1
+    assert places[0]['_walking'] is None
+    assert places[1]['_walking']['seconds'] == 600.5
+    assert attach_walking_routes({'places': [{}]})[0]['_walking'] is None
+
+
+@pytest.mark.parametrize('duration', ['bad', '-1s', 'NaNs', 'infs', None, 600])
+def test_invalid_walking_durations_are_unknown(duration):
+    assert walking_route({'legs': [{'duration': duration, 'distanceMeters': 100}]}) is None
+
+
+def test_arrival_time_cross_midnight_and_closed_before_arrival():
+    now = datetime(2026, 10, 18, 23, 50, tzinfo=timezone.utc)
+    end = datetime(2026, 10, 19, 0, 30, tzinfo=timezone.utc)
+    assert arrival_minutes(end, now, 12 * 60) == 28
+    assert arrival_minutes(end, now, 40 * 60) == 0
+    assert arrival_minutes(end, now, 41 * 60) == -1
+    assert arrival_minutes(None, now, 0) is None
+
+
+def test_walk_filter_and_sort_unknown_last():
+    base = {'location': {'latitude': 25, 'longitude': 121}}
+    places = [dict(base, displayName={'text': 'unknown'}, _walking=None),
+              dict(base, displayName={'text': 'slow'}, _walking={'seconds': 901, 'meters': 1000}),
+              dict(base, displayName={'text': 'fast'}, _walking={'seconds': 600, 'meters': 800})]
+    now = datetime.now(timezone.utc)
+    rows = live_rows(places, 25, 121, 1, False, 0, '步行最快', now)
+    assert [r[0].name for r in rows] == ['fast', 'slow', 'unknown']
+    rows = live_rows(places, 25, 121, 1, False, 0, '步行最快', now, max_walk=15)
+    assert [r[0].name for r in rows] == ['fast']
 
 
 def test_category_uses_primary_before_secondary():

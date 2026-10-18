@@ -19,6 +19,7 @@ if __name__ == '__main__':
                                 external_used=config.get('EXTERNAL_USAGE_BY_MONTH', {}).get(month_key(), 0))
         rows = live_rows(places, 24.9683, 121.1929, 3, False, 0, '距離最近', datetime.now(timezone.utc))
         print(f'Live API check passed: {len(places)} places, {len(rows)} displayable restaurants.')
+        print(f'Walking routes available: {sum(p.get("_walking") is not None for p in places)}.')
     except ValueError as error:
         print(str(error))
         raise SystemExit(1)

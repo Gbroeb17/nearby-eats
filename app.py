@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timezone, time, timedelta
-from places_api import fetch_nearby, live_rows
+from places_api import fetch_nearby, live_rows, arrival_minutes
+from math import ceil
 from restaurant import DEMO_PLACES, search
 import streamlit as st
 import sqlite3
@@ -13,7 +14,8 @@ st.write('依種類找餐廳，看看哪些店還來得及吃。')
 mode = st.radio('資料來源', ['Google 真實搜尋', '模擬展示'], horizontal=True)
 live = mode == 'Google 真實搜尋'
 if live:
-    st.info('按「搜尋附近餐廳」才會向 Google 發出一次請求（可能計費）。分類與排序不會新增請求。每次最多取得最近的 20 家餐廳，不包含範圍內所有店家。')
+    st.info('按「搜尋附近餐廳」才會向 Google 發出一次請求，同時取得餐廳與步行預估（可能計費）。分類與排序不會新增請求。每次最多取得直線距離最近的 20 家餐廳，不包含範圍內所有店家。')
+    st.caption('步行時間以搜尋中心為起點。Google 步行路線可能缺少人行道或步道資訊，請依現場情況通行；預估未包含候餐、點餐與最後收客時間。')
 else:
     st.warning('展示模式：所有店名、評分、座標與每日營業時段都是虛構資料，不代表真實店家。')
 
@@ -48,7 +50,11 @@ with st.sidebar:
         lon = st.number_input('經度', min_value=-180.0, max_value=180.0,
                               key='search_lon', format='%.6f', on_change=mark_manual)
     radius = st.select_slider('直線搜尋半徑（公里）', options=[1, 3, 5], value=3)
-    sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高'])
+    sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高', '步行最快'] if live else ['距離最近', '評分最高'])
+    max_walk = 0
+    if live:
+        max_walk = st.selectbox('最多步行多久', [0, 5, 10, 15, 20, 30],
+                               format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
     only_open = st.checkbox('只看營業中', value=True)
     min_remaining = st.selectbox('至少多久後才打烊', [0, 30, 60, 90], format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
     demo_time = time(19, 0)
@@ -120,7 +126,10 @@ if live:
         st.warning('結果已超過五分鐘，營業狀態可能改變，請重新搜尋。')
         st.stop()
     st.caption(f'資料來源：Google Maps · 查詢於 {fetched_at.astimezone(timezone(timedelta(hours=8))):%H:%M:%S}（台灣時間）。營業資訊以查詢時資料為準。')
-    rows = live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    rows = live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now, max_walk=max_walk)
+    if places and not any(p.get('_walking') for p in places):
+        st.warning('這批結果沒有步行資料。若是更新前取得的結果，請重新搜尋；找不到路線的店家會保留為未知。')
 else:
     rows = search(DEMO_PLACES, lat, lon, radius, minute, only_open=only_open,
                   min_remaining=min_remaining, sort_by=sort_by)
@@ -157,9 +166,24 @@ else:
             with st.container(border=True):
                 st.markdown(f'**{rank}. {place.name}**')
                 rating = f'★ {place.rating:.1f}（{place.reviews} 則）' if place.rating is not None else '尚無評分'
-                st.write(f'{rating} · {distance:.2f} 公里')
+                st.write(f'{rating} · 直線距離 {distance:.2f} 公里')
                 if live:
                     opened, left, end, raw = remaining
+                    walk = raw.get('_walking')
+                    if walk is None:
+                        st.write('🚶 無法取得步行路線時間')
+                    else:
+                        st.write(f'🚶 步行約 {ceil(walk["seconds"] / 60)} 分鐘 · 路線距離 {walk["meters"] / 1000:.2f} 公里')
+                        if opened is True and end is not None:
+                            after_arrival = arrival_minutes(end, now, walk['seconds'])
+                            if after_arrival <= 0:
+                                st.warning('依目前預估，抵達時可能已打烊或正好打烊。')
+                            else:
+                                st.write(f'抵達後距離打烊約剩 {after_arrival} 分鐘')
+                        elif opened is True:
+                            st.caption('打烊時間未知，無法估算抵達後剩餘時間。')
+                        st.link_button('開啟步行導航',
+                                       f'https://www.google.com/maps/dir/?api=1&origin={lat},{lon}&destination={place.lat},{place.lon}&travelmode=walking')
                     if opened is True:
                         st.write('🟢 營業中' + (f' · {end:%m/%d %H:%M} 打烊（剩 {left} 分鐘）' if end else ' · 打烊時間不明'))
                         if left is not None and left <= 60:
