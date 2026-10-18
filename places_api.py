@@ -124,7 +124,7 @@ def next_opening(place, now):
 
 
 def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,
-              max_walk=0):
+              max_walk=0, opening_within=0):
     rows = []
     for raw in places:
         loc = raw.get('location', {})
@@ -135,9 +135,13 @@ def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,
                            raw.get('rating'), raw.get('userRatingCount', 0), None)
         distance = distance_km(lat, lon, place)
         opened, remaining, end = opening_status(raw, now)
-        if distance > radius or (only_open and opened is not True):
+        if opening_within:
+            waiting, _ = next_opening(raw, now)
+            if opened is not False or waiting is None or not 0 < waiting <= opening_within:
+                continue
+        if distance > radius or (only_open and not opening_within and opened is not True):
             continue
-        if min_remaining and (opened is not True or remaining is None or remaining < min_remaining):
+        if min_remaining and not opening_within and (opened is not True or remaining is None or remaining < min_remaining):
             continue
         walk = raw.get('_walking')
         if max_walk and (walk is None or walk['seconds'] > max_walk * 60):

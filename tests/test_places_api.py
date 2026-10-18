@@ -29,6 +29,22 @@ def test_next_opening_unknown_and_closed_business():
     assert next_opening(place, now) == (None, None)
 
 
+def test_opening_within_thirty_minutes_boundaries():
+    from datetime import timedelta
+    now = datetime(2026, 10, 18, 15, 50, tzinfo=timezone.utc)
+    base = {'location': {'latitude': 25, 'longitude': 121}}
+    places = []
+    for seconds in (0, 1, 1800, 1801):
+        places.append(dict(base, displayName={'text': str(seconds)},
+                           currentOpeningHours={'openNow': False,
+                             'nextOpenTime': (now + timedelta(seconds=seconds)).isoformat()}))
+    places += [dict(base, currentOpeningHours={'openNow': True}),
+               dict(base, currentOpeningHours={'openNow': False}),
+               dict(places[1], businessStatus='CLOSED_TEMPORARILY')]
+    rows = live_rows(places, 25, 121, 3, True, 60, '距離最近', now, opening_within=30)
+    assert {r[0].name for r in rows} == {'1', '1800'}
+
+
 def test_walking_summary_request_and_alignment():
     payload = {'places': [{'displayName': {'text': 'A'}}, {'displayName': {'text': 'B'}}],
                'routingSummaries': [{}, {'legs': [{'duration': '600.5s', 'distanceMeters': 850}]}]}

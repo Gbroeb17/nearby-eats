@@ -41,16 +41,20 @@ def minutes_until_open(hours, minute: int) -> int | None:
 
 
 def search(places, lat, lon, radius, minute, category='全部', only_open=False,
-           min_remaining=0, sort_by='距離最近'):
+           min_remaining=0, sort_by='距離最近', opening_within=0):
     result = []
     for place in places:
         distance = distance_km(lat, lon, place)
         remaining = minutes_until_close(place.hours, minute)
+        if opening_within:
+            waiting = minutes_until_open(place.hours, minute)
+            if waiting is None or not 0 < waiting <= opening_within:
+                continue
         if distance > radius or (category != '全部' and place.category != category):
             continue
-        if (only_open or min_remaining > 0) and (remaining is None or remaining <= 0):
+        if not opening_within and (only_open or min_remaining > 0) and (remaining is None or remaining <= 0):
             continue
-        if min_remaining and remaining < min_remaining:
+        if not opening_within and min_remaining and remaining < min_remaining:
             continue
         result.append((place, distance, remaining))
     if sort_by == '評分最高':

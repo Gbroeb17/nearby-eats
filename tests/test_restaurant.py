@@ -8,6 +8,14 @@ def test_demo_next_opening_for_split_and_overnight_hours():
     assert minutes_until_open(None, 900) is None
 
 
+def test_demo_opening_soon_excludes_open_and_unknown():
+    places = [Restaurant('soon', 'A', 25, 121, 4, 1, ((1020, 1200),)),
+              Restaurant('open', 'A', 25, 121, 4, 1, ((900, 1200),)),
+              Restaurant('unknown', 'A', 25, 121, 4, 1, None)]
+    rows = search(places, 25, 121, 3, 990, only_open=True, min_remaining=60, opening_within=30)
+    assert [r[0].name for r in rows] == ['soon']
+
+
 def test_overnight_and_exact_closing():
     hours = ((1080, 120),)
     assert minutes_until_close(hours, 23 * 60) == 180

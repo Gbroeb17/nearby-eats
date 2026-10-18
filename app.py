@@ -55,10 +55,24 @@ with st.sidebar:
     if live:
         max_walk = st.selectbox('最多步行多久', [0, 5, 10, 15, 20, 30],
                                format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
-    only_open = st.checkbox('只看營業中', value=True)
+    st.session_state.setdefault('only_open_filter', True)
+    st.session_state.setdefault('opening_soon_filter', False)
+    def choose_open_now():
+        if st.session_state.only_open_filter:
+            st.session_state.opening_soon_filter = False
+    def choose_opening_soon():
+        if st.session_state.opening_soon_filter:
+            st.session_state.only_open_filter = False
+            st.session_state.min_remaining_filter = 0
+    only_open = st.checkbox('只看營業中', key='only_open_filter', on_change=choose_open_now)
+    opening_soon = st.checkbox('30 分鐘內會開門', key='opening_soon_filter', on_change=choose_opening_soon)
+    if opening_soon:
+        st.caption('只顯示目前休息中、未來 30 分鐘內預計開門的店家。')
     if only_open:
         st.caption('取消「只看營業中」可查看休息中餐廳的開門倒數。')
-    min_remaining = st.selectbox('至少多久後才打烊', [0, 30, 60, 90], format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
+    min_remaining = st.selectbox('至少多久後才打烊', [0, 30, 60, 90],
+                                key='min_remaining_filter', disabled=opening_soon,
+                                format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
     demo_time = time(19, 0)
     if not live:
         demo_time = st.time_input('模擬查詢時間（台灣時間）', value=demo_time)
@@ -129,12 +143,13 @@ if live:
         st.stop()
     st.caption(f'資料來源：Google Maps · 查詢於 {fetched_at.astimezone(timezone(timedelta(hours=8))):%H:%M:%S}（台灣時間）。營業資訊以查詢時資料為準。')
     now = datetime.now(timezone.utc)
-    rows = live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now, max_walk=max_walk)
+    rows = live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,
+                     max_walk=max_walk, opening_within=30 if opening_soon else 0)
     if places and not any(p.get('_walking') for p in places):
         st.warning('這批結果沒有步行資料。若是更新前取得的結果，請重新搜尋；找不到路線的店家會保留為未知。')
 else:
     rows = search(DEMO_PLACES, lat, lon, radius, minute, only_open=only_open,
-                  min_remaining=min_remaining, sort_by=sort_by)
+                  min_remaining=min_remaining, sort_by=sort_by, opening_within=30 if opening_soon else 0)
 groups = defaultdict(list)
 for row in rows:
     groups[row[0].category].append(row)
