@@ -1,6 +1,6 @@
 """Google Places adapter. Never include credentials in errors or stored results."""
 import json
-from math import isfinite, floor
+from math import isfinite, floor, ceil
 from datetime import datetime, timezone, timedelta
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -102,6 +102,25 @@ def opening_status(place, now):
     offset = place.get('utcOffsetMinutes')
     local_end = end.astimezone(timezone(timedelta(minutes=offset))) if end and offset is not None else end
     return opened, remaining, local_end
+
+
+def next_opening(place, now):
+    """Return wait minutes and next opening timestamp; never invent missing hours."""
+    if place.get('businessStatus') in ('CLOSED_TEMPORARILY', 'CLOSED_PERMANENTLY'):
+        return None, None
+    hours = place.get('currentOpeningHours', {})
+    if hours.get('openNow') is not False:
+        return None, None
+    try:
+        opening = datetime.fromisoformat(hours['nextOpenTime'].replace('Z', '+00:00'))
+        if opening.tzinfo is None:
+            return None, None
+        waiting = max(0, ceil((opening - now).total_seconds() / 60))
+        offset = place.get('utcOffsetMinutes')
+        local = opening.astimezone(timezone(timedelta(minutes=offset))) if offset is not None else opening
+        return waiting, local
+    except (KeyError, ValueError, TypeError, OverflowError):
+        return None, None
 
 
 def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,

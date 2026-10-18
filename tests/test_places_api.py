@@ -6,6 +6,27 @@ import json
 import pytest
 from places_api import category_of, opening_status, live_rows, fetch_nearby
 from places_api import attach_walking_routes, walking_route, arrival_minutes
+from places_api import next_opening
+
+
+def test_next_opening_countdown_and_cross_day():
+    now = datetime(2026, 10, 18, 15, 50, tzinfo=timezone.utc)
+    place = {'utcOffsetMinutes': 480, 'currentOpeningHours': {
+        'openNow': False, 'nextOpenTime': '2026-10-18T16:10:30Z'}}
+    waiting, opening = next_opening(place, now)
+    assert waiting == 21
+    assert opening.day == 19 and opening.hour == 0 and opening.minute == 10
+    assert next_opening(place, datetime(2026, 10, 18, 17, tzinfo=timezone.utc))[0] == 0
+
+
+def test_next_opening_unknown_and_closed_business():
+    now = datetime.now(timezone.utc)
+    assert next_opening({}, now) == (None, None)
+    for stamp in ('invalid', '2026-10-19T12:00:00'):
+        assert next_opening({'currentOpeningHours': {'openNow': False, 'nextOpenTime': stamp}}, now) == (None, None)
+    place = {'businessStatus': 'CLOSED_PERMANENTLY', 'currentOpeningHours': {
+        'openNow': False, 'nextOpenTime': '2026-10-19T12:00:00Z'}}
+    assert next_opening(place, now) == (None, None)
 
 
 def test_walking_summary_request_and_alignment():

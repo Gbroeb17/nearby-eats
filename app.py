@@ -1,8 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timezone, time, timedelta
-from places_api import fetch_nearby, live_rows, arrival_minutes
+from places_api import fetch_nearby, live_rows, arrival_minutes, next_opening
 from math import ceil
-from restaurant import DEMO_PLACES, search
+from restaurant import DEMO_PLACES, search, minutes_until_open
 import streamlit as st
 import sqlite3
 from usage_limit import DEFAULT_LIMIT, DEFAULT_DB, month_key, used_count, limited_search
@@ -56,6 +56,8 @@ with st.sidebar:
         max_walk = st.selectbox('最多步行多久', [0, 5, 10, 15, 20, 30],
                                format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
     only_open = st.checkbox('只看營業中', value=True)
+    if only_open:
+        st.caption('取消「只看營業中」可查看休息中餐廳的開門倒數。')
     min_remaining = st.selectbox('至少多久後才打烊', [0, 30, 60, 90], format_func=lambda x: '不限' if x == 0 else f'{x} 分鐘')
     demo_time = time(19, 0)
     if not live:
@@ -189,7 +191,24 @@ else:
                         if left is not None and left <= 60:
                             st.warning('即將打烊')
                     else:
-                        st.write('🔴 休息中' if opened is False else '⚪ 營業狀態不明')
+                        if opened is False:
+                            waiting, opening = next_opening(raw, now)
+                            if raw.get('businessStatus') == 'CLOSED_PERMANENTLY':
+                                st.write('🔴 已永久停業')
+                            elif raw.get('businessStatus') == 'CLOSED_TEMPORARILY':
+                                st.write('🔴 暫停營業 · 恢復時間不明')
+                            elif waiting is None:
+                                st.write('🔴 休息中 · 下次開門時間不明')
+                            elif waiting == 0:
+                                st.warning('預定開門時間已到，請重新搜尋確認目前營業狀態。')
+                            else:
+                                hours, mins = divmod(waiting, 60)
+                                wait_text = f'{hours} 小時 {mins} 分鐘' if hours else f'{mins} 分鐘'
+                                st.write(f'🕒 再過 {wait_text} 開門')
+                                st.caption(f'下次開門：{opening:%m/%d %H:%M}（店家當地時間）' if raw.get('utcOffsetMinutes') is not None
+                                           else f'下次開門：{opening:%m/%d %H:%M}（UTC）')
+                        else:
+                            st.write('⚪ 營業狀態不明')
                     st.write(raw.get('formattedAddress', ''))
                     if raw.get('googleMapsUri', '').startswith('https://'):
                         st.link_button('在 Google Maps 開啟', raw['googleMapsUri'])
@@ -198,7 +217,13 @@ else:
                 elif remaining is None:
                     st.write('⚪ 營業時間不明')
                 elif remaining == 0:
-                    st.write('🔴 休息中')
+                    waiting = minutes_until_open(place.hours, minute)
+                    if waiting is None:
+                        st.write('🔴 休息中 · 下次開門時間不明')
+                    else:
+                        opening = minute + waiting
+                        prefix = '明日' if opening >= 1440 else '今日'
+                        st.write(f'🕒 再過 {waiting} 分鐘開門 · {prefix} {(opening // 60) % 24:02d}:{opening % 60:02d}')
                 else:
                     closing = minute + remaining
                     prefix = '明日' if closing >= 1440 else '今日'

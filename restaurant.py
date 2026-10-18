@@ -33,6 +33,13 @@ def minutes_until_close(hours, minute: int) -> int | None:
     return 0
 
 
+def minutes_until_open(hours, minute: int) -> int | None:
+    """Daily fictional schedule only; live data uses Google's nextOpenTime."""
+    if not hours or minutes_until_close(hours, minute):
+        return None
+    return min((opening - minute) % 1440 for opening, _ in hours)
+
+
 def search(places, lat, lon, radius, minute, category='全部', only_open=False,
            min_remaining=0, sort_by='距離最近'):
     result = []

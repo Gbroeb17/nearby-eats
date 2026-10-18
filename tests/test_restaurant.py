@@ -1,4 +1,11 @@
-from restaurant import Restaurant, distance_km, minutes_until_close, search
+from restaurant import Restaurant, distance_km, minutes_until_close, search, minutes_until_open
+
+
+def test_demo_next_opening_for_split_and_overnight_hours():
+    assert minutes_until_open(((660, 840), (1020, 1260)), 900) == 120
+    assert minutes_until_open(((660, 840),), 1380) == 720
+    assert minutes_until_open(((1080, 120),), 60) is None
+    assert minutes_until_open(None, 900) is None
 
 
 def test_overnight_and_exact_closing():
