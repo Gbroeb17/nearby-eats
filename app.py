@@ -78,6 +78,7 @@ with st.sidebar:
         demo_time = st.time_input('模擬查詢時間（台灣時間）', value=demo_time)
         st.caption('展示時段假設每天相同。')
     blocked = False
+    blocked_message = '本月查詢額度已達網站上限，暫不開放新的查詢。'
     limit = DEFAULT_LIMIT
     external_used = 0
     quota_path = None
@@ -102,9 +103,9 @@ with st.sidebar:
             blocked = used + external_used >= limit
         except (sqlite3.Error, OSError, ValueError):
             blocked = True
-            st.error('無法確認查詢額度，暫停查詢，請聯絡管理者。')
+            blocked_message = '暫時無法讀取查詢額度，不代表額度已用完。請管理者確認 Supabase 是否暫停、資料庫連線及額度設定是否正常，恢復後重新整理頁面。'
         if blocked:
-            st.error('本月查詢額度已達上限或無法確認，暫不開放查詢。')
+            st.error(blocked_message)
         st.caption('此為網站共用計數，不是 Google 官方帳單用量。模擬展示仍可使用。')
     if live and st.button('搜尋附近餐廳', type='primary', disabled=blocked):
         try:
