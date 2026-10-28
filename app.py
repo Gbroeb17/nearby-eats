@@ -50,7 +50,11 @@ with st.sidebar:
         lon = st.number_input('經度', min_value=-180.0, max_value=180.0,
                               key='search_lon', format='%.6f', on_change=mark_manual)
     radius = st.select_slider('直線搜尋半徑（公里）', options=[1, 3, 5], value=3)
-    sort_by = st.selectbox('各種類內排序', ['距離最近', '評分最高', '步行最快'] if live else ['距離最近', '評分最高'])
+    sort_by = st.selectbox('各種類內排序',
+                           ['打烊剩餘時間：少到多', '距離最近', '評分最高', '步行最快'] if live
+                           else ['打烊剩餘時間：少到多', '距離最近', '評分最高'])
+    if sort_by == '打烊剩餘時間：少到多':
+        st.caption('營業中且打烊時間已知的店家優先；剩餘時間越少排越前面，其他店家排在後面。')
     max_walk = 0
     if live:
         max_walk = st.selectbox('最多步行多久', [0, 5, 10, 15, 20, 30],

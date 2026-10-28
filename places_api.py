@@ -147,7 +147,11 @@ def live_rows(places, lat, lon, radius, only_open, min_remaining, sort_by, now,
         if max_walk and (walk is None or walk['seconds'] > max_walk * 60):
             continue
         rows.append((place, distance, (opened, remaining, end, raw)))
-    if sort_by == '步行最快':
+    if sort_by == '打烊剩餘時間：少到多':
+        rows.sort(key=lambda r: (r[2][2].timestamp()
+                                if r[2][0] is True and r[2][2] is not None else float('inf'),
+                                r[1], r[0].name))
+    elif sort_by == '步行最快':
         rows.sort(key=lambda r: (r[2][3].get('_walking') is None,
                                 (r[2][3].get('_walking') or {}).get('seconds', float('inf')), r[1]))
     elif sort_by == '評分最高':

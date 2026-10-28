@@ -1,6 +1,16 @@
 from restaurant import Restaurant, distance_km, minutes_until_close, search, minutes_until_open
 
 
+def test_demo_closing_sort_orders_overnight_and_unknown():
+    places = [Restaurant('overnight', 'A', 25, 121, 4, 1, ((1080, 120),)),
+              Restaurant('soon', 'A', 25, 121, 4, 1, ((1080, 1410),)),
+              Restaurant('unknown', 'A', 25, 121, 4, 1, None),
+              Restaurant('closed', 'A', 25, 121, 4, 1, ())]
+    rows = search(places, 25, 121, 1, 1380, sort_by='打烊剩餘時間：少到多')
+    assert [r[0].name for r in rows[:2]] == ['soon', 'overnight']
+    assert {r[0].name for r in rows[2:]} == {'unknown', 'closed'}
+
+
 def test_demo_next_opening_for_split_and_overnight_hours():
     assert minutes_until_open(((660, 840), (1020, 1260)), 900) == 120
     assert minutes_until_open(((660, 840),), 1380) == 720

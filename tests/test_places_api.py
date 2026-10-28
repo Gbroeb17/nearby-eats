@@ -9,6 +9,21 @@ from places_api import attach_walking_routes, walking_route, arrival_minutes
 from places_api import next_opening
 
 
+def test_closing_sort_uses_exact_time_and_puts_closed_unknown_last():
+    from datetime import timedelta
+    now = datetime(2026, 10, 28, 15, 50, tzinfo=timezone.utc)
+    base = {'location': {'latitude': 25, 'longitude': 121}}
+    places = [dict(base, displayName={'text': 'later'}, currentOpeningHours={
+        'openNow': True, 'nextCloseTime': (now + timedelta(minutes=40)).isoformat()}),
+        dict(base, displayName={'text': 'soon'}, currentOpeningHours={
+        'openNow': True, 'nextCloseTime': (now + timedelta(seconds=30)).isoformat()}),
+        dict(base, displayName={'text': 'unknown'}, currentOpeningHours={'openNow': True}),
+        dict(base, displayName={'text': 'closed'}, currentOpeningHours={'openNow': False})]
+    rows = live_rows(places, 25, 121, 1, False, 0, '打烊剩餘時間：少到多', now)
+    assert [r[0].name for r in rows[:2]] == ['soon', 'later']
+    assert {r[0].name for r in rows[2:]} == {'unknown', 'closed'}
+
+
 def test_next_opening_countdown_and_cross_day():
     now = datetime(2026, 10, 18, 15, 50, tzinfo=timezone.utc)
     place = {'utcOffsetMinutes': 480, 'currentOpeningHours': {

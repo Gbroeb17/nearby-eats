@@ -57,7 +57,10 @@ def search(places, lat, lon, radius, minute, category='全部', only_open=False,
         if not opening_within and min_remaining and remaining < min_remaining:
             continue
         result.append((place, distance, remaining))
-    if sort_by == '評分最高':
+    if sort_by == '打烊剩餘時間：少到多':
+        result.sort(key=lambda row: (row[2] if row[2] is not None and row[2] > 0 else float('inf'),
+                                     row[1], row[0].name))
+    elif sort_by == '評分最高':
         result.sort(key=lambda row: (-(row[0].rating if row[0].rating is not None else -1),
                                      -row[0].reviews, row[1], row[0].name))
     else:
